@@ -104,6 +104,24 @@ function normalizeSchemaOrg(schema: any): ExtractedRecipe {
   }
 }
 
+// Strip HTML tags and truncate to avoid token limits
+function extractTextFromHtml(html: string): string {
+  // Remove script and style tags entirely
+  let text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Truncate to ~15000 chars which is well within Claude's limits
+  if (text.length > 15000) {
+    text = text.substring(0, 15000)
+  }
+
+  return text
+}
+
 // Main parser — tries Schema.org first, falls back to Claude
 export async function parseRecipeFromHtml(html: string): Promise<ExtractedRecipe | null> {
   // Try Schema.org first — free and fast
@@ -112,11 +130,13 @@ export async function parseRecipeFromHtml(html: string): Promise<ExtractedRecipe
     return schemaRecipe
   }
 
-  // Fall back to Claude extraction
-  return extractRecipeFromHtml(html)
+  // Fall back to Claude extraction with stripped/truncated text
+  const cleanText = extractTextFromHtml(html)
+  return extractRecipeFromHtml(cleanText)
 }
 
 // Parse a recipe from raw text (for manual entry or paste)
 export async function parseRecipeFromText(text: string): Promise<ExtractedRecipe | null> {
-  return extractRecipeFromHtml(text)
+  const truncated = text.length > 15000 ? text.substring(0, 15000) : text
+  return extractRecipeFromHtml(truncated)
 }
