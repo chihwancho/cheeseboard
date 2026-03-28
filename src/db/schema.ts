@@ -5,6 +5,7 @@ import {
   text,
   integer,
   real,
+  boolean,
   timestamp,
   jsonb,
   uniqueIndex,
@@ -128,15 +129,18 @@ export const mealPlans = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name').notNull(),                 // "Week of March 25"
-    startDate: text('start_date').notNull(),       // ISO date string
+    name: text('name').notNull(),
+    startDate: text('start_date').notNull(),
     endDate: text('end_date').notNull(),
-    constraints: jsonb('constraints'),             // { diet, excludedIngredients, calories etc. }
-    plan: jsonb('plan').notNull(),                 // full structured meal plan
+    constraints: jsonb('constraints'),
+    plan: jsonb('plan').notNull(),
+    isActive: boolean('is_active').notNull().default(true),   // false = superseded or deleted
+    deletedAt: timestamp('deleted_at', { withTimezone: true }), // soft delete
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     userIdIdx: index('meal_plans_user_id_idx').on(table.userId),
+    userActiveIdx: index('meal_plans_user_active_idx').on(table.userId, table.isActive),
   })
 )
 

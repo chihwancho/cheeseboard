@@ -3,6 +3,7 @@ import { handle } from 'hono/vercel'
 import { cors } from 'hono/cors'
 import { createServer } from 'node:http'
 import { recipes } from './routes/recipes.js'
+import { plans } from './routes/plans.js'
 
 const app = new Hono().basePath('/')
 
@@ -15,6 +16,7 @@ app.use('*', cors({
 
 app.get('/', (c) => c.json({ status: 'ok' }))
 app.route('/recipes', recipes)
+app.route('/plans', plans)
 
 // Vercel exports
 export const GET = handle(app)
