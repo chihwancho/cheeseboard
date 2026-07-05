@@ -11,8 +11,13 @@ function extractSchemaOrg(html: string): ExtractedRecipe | null {
       try {
         const data = JSON.parse(match[1])
 
-        // Handle both single objects and arrays
-        const items = Array.isArray(data) ? data : [data]
+        // Handle single objects, arrays, and the common WordPress/Yoast
+        // pattern of a single object wrapping an "@graph" array
+        const items = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.['@graph'])
+            ? data['@graph']
+            : [data]
         const recipe = items.find(
           (item: any) =>
             item['@type'] === 'Recipe' ||
