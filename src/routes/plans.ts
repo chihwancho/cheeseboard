@@ -144,7 +144,7 @@ Return ONLY a JSON array, no markdown, no explanation:
 Only include slot keys for: ${slots.join(', ')}`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -403,7 +403,7 @@ Return ONLY a JSON object, no markdown, no explanation:
 Only include categories that have items.`
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-5',
     max_tokens: 2000,
     messages: [{ role: 'user', content: prompt }],
   })

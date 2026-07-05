@@ -25,7 +25,7 @@ export interface ExtractedRecipe {
 // Extract a recipe from raw HTML when Schema.org data isn't available
 export async function extractRecipeFromHtml(html: string): Promise<ExtractedRecipe | null> {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-5',
     max_tokens: 2000,
     messages: [
       {
@@ -65,7 +65,7 @@ export async function enrichRecipe(recipe: {
   dietaryTags: string[]
 }> {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-5',
     max_tokens: 500,
     messages: [
       {
