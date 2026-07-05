@@ -369,13 +369,114 @@ plans.post('/:id/shopping-list', fullAuth, async (c) => {
     .from(recipesTable)
     .where(inArray(recipesTable.id, recipeIds))
 
-  // Build ingredient list with recipe attribution
-  const ingredientLines = recipeDetails.flatMap(recipe => {
-    const ingredients = recipe.ingredients as string[]
-    return ingredients.map(ing => `${ing} [from: ${recipe.name}]`)
-  })
+  let items: Record<string, { item: string; recipes: string[] }[]>
+  try {
+    items = await generateShoppingListItems(
+      recipeDetails.map(r => ({ name: r.name, ingredients: r.ingredients as string[] }))
+    )
+  } catch {
+    return c.json({ error: 'Failed to generate shopping list' }, 500)
+  }
 
-  // Ask Claude to aggregate and categorize
+  // Save shopping list
+  const [shoppingList] = await db
+    .insert(shoppingLists)
+    .values({
+      userId,
+      mealPlanId,
+      name: `Shopping list — ${planResult[0].name}`,
+      items,
+    })
+    .returning()
+
+  return c.json({ success: true, shoppingList })
+})
+
+// ─────────────────────────────────────────────
+// GET /plans/day/:date
+// Recipes scheduled for a single day, plus a
+// shopping list scoped to just that day (not
+// persisted — computed on demand)
+// ─────────────────────────────────────────────
+
+plans.get('/day/:date', fullAuth, async (c) => {
+  const date = c.req.param('date')
+  const userId = await getOrCreateUserId()
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return c.json({ error: 'Invalid date format, expected YYYY-MM-DD' }, 400)
+  }
+
+  const rows = await db
+    .select({
+      mealSlot: mealPlanRecipes.mealSlot,
+      recipeId: recipesTable.id,
+      name: recipesTable.name,
+      description: recipesTable.description,
+      ingredients: recipesTable.ingredients,
+      instructions: recipesTable.instructions,
+      calories: recipesTable.calories,
+      prepTimeMinutes: recipesTable.prepTimeMinutes,
+      cookTimeMinutes: recipesTable.cookTimeMinutes,
+    })
+    .from(mealPlanRecipes)
+    .innerJoin(recipesTable, eq(mealPlanRecipes.recipeId, recipesTable.id))
+    .where(and(eq(mealPlanRecipes.userId, userId), eq(mealPlanRecipes.scheduledDate, date)))
+
+  if (rows.length === 0) {
+    return c.json({ error: `No meals scheduled for ${date}` }, 404)
+  }
+
+  const meals = rows.map(r => ({
+    mealSlot: r.mealSlot,
+    recipe: {
+      id: r.recipeId,
+      name: r.name,
+      description: r.description,
+      ingredients: r.ingredients,
+      instructions: r.instructions,
+      calories: r.calories,
+      prepTimeMinutes: r.prepTimeMinutes,
+      cookTimeMinutes: r.cookTimeMinutes,
+    },
+  }))
+
+  let shoppingList: Record<string, { item: string; recipes: string[] }[]>
+  try {
+    shoppingList = await generateShoppingListItems(
+      rows.map(r => ({ name: r.name, ingredients: r.ingredients as string[] }))
+    )
+  } catch {
+    return c.json({ error: 'Failed to generate shopping list for this day' }, 500)
+  }
+
+  return c.json({ date, meals, shoppingList })
+})
+
+// ─────────────────────────────────────────────
+// Helper
+// ─────────────────────────────────────────────
+
+async function getOrCreateUserId(): Promise<string> {
+  const existing = await db.select().from(users).limit(1)
+  if (existing[0]) return existing[0].id
+  const [created] = await db
+    .insert(users)
+    .values({ email: process.env.OWNER_EMAIL ?? 'owner@localhost' })
+    .returning()
+  return created.id
+}
+
+// Aggregates ingredients across recipes and asks Claude to categorize them
+// into a clean grocery-style shopping list. Shared by the whole-plan and
+// single-day shopping list endpoints. Throws on generation failure.
+async function generateShoppingListItems(
+  recipes: { name: string; ingredients: string[] }[]
+): Promise<Record<string, { item: string; recipes: string[] }[]>> {
+  const ingredientLines = recipes.flatMap(recipe =>
+    recipe.ingredients.map(ing => `${ing} [from: ${recipe.name}]`)
+  )
+
   const prompt = `You are a shopping list organizer. Given this list of ingredients (with recipe attribution in brackets), create a clean categorized shopping list.
 
 Rules:
@@ -410,39 +511,6 @@ Only include categories that have items.`
   })
 
   const text = getResponseText(response) ?? ''
-  let items: any = {}
-
-  try {
-    const clean = text.replace(/```json|```/g, '').trim()
-    items = JSON.parse(clean)
-  } catch {
-    return c.json({ error: 'Failed to generate shopping list' }, 500)
-  }
-
-  // Save shopping list
-  const [shoppingList] = await db
-    .insert(shoppingLists)
-    .values({
-      userId,
-      mealPlanId,
-      name: `Shopping list — ${planResult[0].name}`,
-      items,
-    })
-    .returning()
-
-  return c.json({ success: true, shoppingList })
-})
-
-// ─────────────────────────────────────────────
-// Helper
-// ─────────────────────────────────────────────
-
-async function getOrCreateUserId(): Promise<string> {
-  const existing = await db.select().from(users).limit(1)
-  if (existing[0]) return existing[0].id
-  const [created] = await db
-    .insert(users)
-    .values({ email: process.env.OWNER_EMAIL ?? 'owner@localhost' })
-    .returning()
-  return created.id
+  const clean = text.replace(/```json|```/g, '').trim()
+  return JSON.parse(clean)
 }
