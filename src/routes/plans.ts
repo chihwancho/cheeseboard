@@ -8,6 +8,7 @@ import { fullAuth } from '../middleware/auth.js'
 import { embedQuery } from '../services/embeddings.js'
 import { sql } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
+import { getResponseText } from '../services/claude.js'
 
 export const plans = new Hono()
 
@@ -149,7 +150,7 @@ Only include slot keys for: ${slots.join(', ')}`
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const text = getResponseText(response) ?? ''
     let planDays: any[] = []
 
     try {
@@ -408,7 +409,7 @@ Only include categories that have items.`
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const text = getResponseText(response) ?? ''
   let items: any = {}
 
   try {

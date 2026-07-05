@@ -4,6 +4,13 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
+// Extended thinking can put a 'thinking' block before the 'text' block,
+// so the text response isn't reliably at content[0].
+export function getResponseText(response: Anthropic.Message): string | null {
+  const block = response.content.find((b) => b.type === 'text')
+  return block && block.type === 'text' ? block.text : null
+}
+
 export interface ExtractedRecipe {
   name: string
   description?: string
@@ -44,7 +51,7 @@ ${html}`,
   })
 
   try {
-    const text = response.content[0].type === 'text' ? response.content[0].text : null
+    const text = getResponseText(response)
     if (!text) return null
     const clean = text.replace(/```json|```/g, '').trim()
     if (clean === 'null') return null
@@ -92,7 +99,7 @@ Return this exact shape:
   })
 
   try {
-    const text = response.content[0].type === 'text' ? response.content[0].text : null
+    const text = getResponseText(response)
     if (!text) return { dietaryTags: [] }
     const clean = text.replace(/```json|```/g, '').trim()
     return JSON.parse(clean)
