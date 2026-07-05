@@ -45,8 +45,10 @@ ${html}`,
 
   try {
     const text = response.content[0].type === 'text' ? response.content[0].text : null
-    if (!text || text.trim() === 'null') return null
-    return JSON.parse(text)
+    if (!text) return null
+    const clean = text.replace(/```json|```/g, '').trim()
+    if (clean === 'null') return null
+    return JSON.parse(clean)
   } catch {
     return null
   }
@@ -92,7 +94,8 @@ Return this exact shape:
   try {
     const text = response.content[0].type === 'text' ? response.content[0].text : null
     if (!text) return { dietaryTags: [] }
-    return JSON.parse(text)
+    const clean = text.replace(/```json|```/g, '').trim()
+    return JSON.parse(clean)
   } catch {
     return { dietaryTags: [] }
   }
