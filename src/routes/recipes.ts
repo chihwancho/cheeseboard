@@ -8,6 +8,7 @@ import { fullAuth, anyAuth } from '../middleware/auth.js'
 import { parseRecipeFromHtml, parseRecipeFromText } from '../services/parser.js'
 import { enrichRecipe } from '../services/claude.js'
 import { buildRecipeEmbeddingText, embedRecipe, embedQuery } from '../services/embeddings.js'
+import { generateShoppingListItems } from './plans.js'
 
 export const recipes = new Hono()
 
@@ -320,6 +321,63 @@ recipes.get('/', fullAuth, async (c) => {
     .orderBy(recipesTable.createdAt)
 
   return c.json({ recipes: results, total: results.length })
+})
+
+// ─────────────────────────────────────────────
+// GET /recipes/random
+// A random recipe, optionally filtered by a
+// dietary tag, plus a shopping list for it
+// ─────────────────────────────────────────────
+
+recipes.get('/random', fullAuth, async (c) => {
+  const userId = await getOrCreateUserId()
+  const tag = c.req.query('tag')
+
+  const conditions = tag
+    ? and(eq(recipesTable.userId, userId), sql`${recipesTable.dietaryTags} @> ARRAY[${tag}]::text[]`)
+    : eq(recipesTable.userId, userId)
+
+  const [recipe] = await db
+    .select({
+      id: recipesTable.id,
+      name: recipesTable.name,
+      description: recipesTable.description,
+      ingredients: recipesTable.ingredients,
+      instructions: recipesTable.instructions,
+      yield: recipesTable.yield,
+      prepTimeMinutes: recipesTable.prepTimeMinutes,
+      cookTimeMinutes: recipesTable.cookTimeMinutes,
+      category: recipesTable.category,
+      cuisine: recipesTable.cuisine,
+      keywords: recipesTable.keywords,
+      dietaryTags: recipesTable.dietaryTags,
+      calories: recipesTable.calories,
+      proteinGrams: recipesTable.proteinGrams,
+      fatGrams: recipesTable.fatGrams,
+      carbGrams: recipesTable.carbGrams,
+      rating: recipesTable.rating,
+      ratingNote: recipesTable.ratingNote,
+      sourceUrl: recipesTable.sourceUrl,
+    })
+    .from(recipesTable)
+    .where(conditions)
+    .orderBy(sql`random()`)
+    .limit(1)
+
+  if (!recipe) {
+    return c.json({ error: tag ? `No recipes found with tag "${tag}"` : 'No recipes found' }, 404)
+  }
+
+  let shoppingList: Record<string, { item: string; recipes: string[] }[]>
+  try {
+    shoppingList = await generateShoppingListItems([
+      { name: recipe.name, ingredients: recipe.ingredients as string[] },
+    ])
+  } catch {
+    return c.json({ error: 'Failed to generate shopping list' }, 500)
+  }
+
+  return c.json({ recipe, shoppingList })
 })
 
 // ─────────────────────────────────────────────

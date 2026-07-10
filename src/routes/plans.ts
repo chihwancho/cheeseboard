@@ -470,7 +470,7 @@ async function getOrCreateUserId(): Promise<string> {
 // Aggregates ingredients across recipes and asks Claude to categorize them
 // into a clean grocery-style shopping list. Shared by the whole-plan and
 // single-day shopping list endpoints. Throws on generation failure.
-async function generateShoppingListItems(
+export async function generateShoppingListItems(
   recipes: { name: string; ingredients: string[] }[]
 ): Promise<Record<string, { item: string; recipes: string[] }[]>> {
   const ingredientLines = recipes.flatMap(recipe =>
