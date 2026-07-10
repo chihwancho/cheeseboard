@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '../db/db.js'
-import { recipes as recipesTable, mealPlans, mealPlanRecipes, shoppingLists, users } from '../db/schema.js'
+import { recipes as recipesTable, mealPlans, mealPlanRecipes, shoppingLists, users, recipeColumns } from '../db/schema.js'
 import { fullAuth } from '../middleware/auth.js'
 import { embedQuery } from '../services/embeddings.js'
 import { sql } from 'drizzle-orm'
@@ -410,14 +410,7 @@ plans.get('/day/:date', fullAuth, async (c) => {
   const rows = await db
     .select({
       mealSlot: mealPlanRecipes.mealSlot,
-      recipeId: recipesTable.id,
-      name: recipesTable.name,
-      description: recipesTable.description,
-      ingredients: recipesTable.ingredients,
-      instructions: recipesTable.instructions,
-      calories: recipesTable.calories,
-      prepTimeMinutes: recipesTable.prepTimeMinutes,
-      cookTimeMinutes: recipesTable.cookTimeMinutes,
+      ...recipeColumns,
     })
     .from(mealPlanRecipes)
     .innerJoin(recipesTable, eq(mealPlanRecipes.recipeId, recipesTable.id))
@@ -427,19 +420,7 @@ plans.get('/day/:date', fullAuth, async (c) => {
     return c.json({ error: `No meals scheduled for ${date}` }, 404)
   }
 
-  const meals = rows.map(r => ({
-    mealSlot: r.mealSlot,
-    recipe: {
-      id: r.recipeId,
-      name: r.name,
-      description: r.description,
-      ingredients: r.ingredients,
-      instructions: r.instructions,
-      calories: r.calories,
-      prepTimeMinutes: r.prepTimeMinutes,
-      cookTimeMinutes: r.cookTimeMinutes,
-    },
-  }))
+  const meals = rows.map(({ mealSlot, ...recipe }) => ({ mealSlot, recipe }))
 
   let shoppingList: Record<string, { item: string; recipes: string[] }[]>
   try {

@@ -117,6 +117,30 @@ export const recipes = pgTable(
   })
 )
 
+// Public recipe field set (excludes userId and embedding) — shared by every
+// endpoint that returns a recipe, so their response shapes can't drift apart.
+export const recipeColumns = {
+  id: recipes.id,
+  name: recipes.name,
+  description: recipes.description,
+  ingredients: recipes.ingredients,
+  instructions: recipes.instructions,
+  yield: recipes.yield,
+  prepTimeMinutes: recipes.prepTimeMinutes,
+  cookTimeMinutes: recipes.cookTimeMinutes,
+  category: recipes.category,
+  cuisine: recipes.cuisine,
+  keywords: recipes.keywords,
+  dietaryTags: recipes.dietaryTags,
+  calories: recipes.calories,
+  proteinGrams: recipes.proteinGrams,
+  fatGrams: recipes.fatGrams,
+  carbGrams: recipes.carbGrams,
+  rating: recipes.rating,
+  ratingNote: recipes.ratingNote,
+  sourceUrl: recipes.sourceUrl,
+}
+
 // ─────────────────────────────────────────────
 // Meal Plans
 // Stores generated meal plans with constraints

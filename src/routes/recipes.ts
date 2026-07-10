@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq, and, sql } from 'drizzle-orm'
 import { db } from '../db/db.js'
-import { recipes as recipesTable, users } from '../db/schema.js'
+import { recipes as recipesTable, users, recipeColumns } from '../db/schema.js'
 import { fullAuth, anyAuth } from '../middleware/auth.js'
 import { parseRecipeFromHtml, parseRecipeFromText } from '../services/parser.js'
 import { enrichRecipe } from '../services/claude.js'
@@ -338,27 +338,7 @@ recipes.get('/random', fullAuth, async (c) => {
     : eq(recipesTable.userId, userId)
 
   const [recipe] = await db
-    .select({
-      id: recipesTable.id,
-      name: recipesTable.name,
-      description: recipesTable.description,
-      ingredients: recipesTable.ingredients,
-      instructions: recipesTable.instructions,
-      yield: recipesTable.yield,
-      prepTimeMinutes: recipesTable.prepTimeMinutes,
-      cookTimeMinutes: recipesTable.cookTimeMinutes,
-      category: recipesTable.category,
-      cuisine: recipesTable.cuisine,
-      keywords: recipesTable.keywords,
-      dietaryTags: recipesTable.dietaryTags,
-      calories: recipesTable.calories,
-      proteinGrams: recipesTable.proteinGrams,
-      fatGrams: recipesTable.fatGrams,
-      carbGrams: recipesTable.carbGrams,
-      rating: recipesTable.rating,
-      ratingNote: recipesTable.ratingNote,
-      sourceUrl: recipesTable.sourceUrl,
-    })
+    .select(recipeColumns)
     .from(recipesTable)
     .where(conditions)
     .orderBy(sql`random()`)
@@ -377,7 +357,11 @@ recipes.get('/random', fullAuth, async (c) => {
     return c.json({ error: 'Failed to generate shopping list' }, 500)
   }
 
-  return c.json({ recipe, shoppingList })
+  return c.json({
+    date: null,
+    meals: [{ mealSlot: null, recipe }],
+    shoppingList,
+  })
 })
 
 // ─────────────────────────────────────────────
