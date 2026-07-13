@@ -365,6 +365,51 @@ recipes.get('/random', fullAuth, async (c) => {
 })
 
 // ─────────────────────────────────────────────
+// GET /recipes/:id
+// Fetch a single recipe by id
+// ─────────────────────────────────────────────
+
+recipes.get('/:id', fullAuth, async (c) => {
+  const id = c.req.param('id')
+  const userId = await getOrCreateUserId()
+
+  const [recipe] = await db
+    .select(recipeColumns)
+    .from(recipesTable)
+    .where(and(eq(recipesTable.id, id), eq(recipesTable.userId, userId)))
+    .limit(1)
+
+  if (!recipe) {
+    return c.json({ error: 'Recipe not found' }, 404)
+  }
+
+  return c.json({ recipe })
+})
+
+// ─────────────────────────────────────────────
+// DELETE /recipes/:id
+// Permanently delete a recipe. Also removes it
+// from any meal plans it was scheduled in
+// (meal_plan_recipes has an onDelete cascade).
+// ─────────────────────────────────────────────
+
+recipes.delete('/:id', fullAuth, async (c) => {
+  const id = c.req.param('id')
+  const userId = await getOrCreateUserId()
+
+  const [deleted] = await db
+    .delete(recipesTable)
+    .where(and(eq(recipesTable.id, id), eq(recipesTable.userId, userId)))
+    .returning({ id: recipesTable.id, name: recipesTable.name })
+
+  if (!deleted) {
+    return c.json({ error: 'Recipe not found' }, 404)
+  }
+
+  return c.json({ success: true, deleted })
+})
+
+// ─────────────────────────────────────────────
 // Helper
 // ─────────────────────────────────────────────
 
