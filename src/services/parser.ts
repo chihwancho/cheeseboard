@@ -140,8 +140,18 @@ export async function parseRecipeFromHtml(html: string): Promise<ExtractedRecipe
   return extractRecipeFromHtml(cleanText)
 }
 
-// Parse a recipe from raw text (for manual entry or paste)
+// Parse a recipe from raw text — either a hand-typed/pasted recipe, or a
+// full page's outerHTML (e.g. from the save-recipe bookmarklet, which sends
+// the whole rendered page since some sites block server-side URL fetches).
 export async function parseRecipeFromText(text: string): Promise<ExtractedRecipe | null> {
+  if (looksLikeHtml(text)) {
+    return parseRecipeFromHtml(text)
+  }
+
   const truncated = text.length > 15000 ? text.substring(0, 15000) : text
   return extractRecipeFromHtml(truncated)
+}
+
+function looksLikeHtml(text: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(text)
 }
