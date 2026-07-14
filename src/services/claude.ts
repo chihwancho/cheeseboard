@@ -107,3 +107,50 @@ Return this exact shape:
     return { dietaryTags: [] }
   }
 }
+
+export interface IngredientMatch {
+  recipeId: string
+  usedIngredients: string[]
+  missingIngredients: string[]
+}
+
+// Rank candidate recipes by how well they utilize a list of on-hand
+// ingredients — prioritizes recipes using more on-hand ingredients and
+// needing fewer additional ones. Not a plain overlap count: handles loose
+// matching (e.g. "chicken" vs "2 lbs boneless chicken thighs").
+export async function rankRecipesByIngredients(
+  ingredients: string[],
+  candidates: { id: string; name: string; ingredients: string[] }[],
+  limit: number
+): Promise<IngredientMatch[]> {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-5',
+    max_tokens: 4000,
+    messages: [
+      {
+        role: 'user',
+        content: `You are a recipe matcher. Given a list of ingredients someone has on hand, rank the candidate recipes below by how well they utilize those ingredients — prioritize recipes that use more of the on-hand ingredients and require fewer additional ones.
+
+On-hand ingredients:
+${ingredients.join(', ')}
+
+Candidate recipes:
+${candidates.map(r => `- id: ${r.id}, name: "${r.name}", ingredients: ${r.ingredients.join('; ')}`).join('\n')}
+
+Return ONLY a JSON array of the top ${limit} best matches, ordered best match first, no markdown, no explanation:
+[
+  {
+    "recipeId": "uuid",
+    "usedIngredients": ["on-hand ingredients this recipe actually uses"],
+    "missingIngredients": ["other ingredients the recipe needs that aren't on hand"]
+  }
+]
+Only include recipes that use at least one on-hand ingredient. Return fewer than ${limit} if fewer qualify.`,
+      },
+    ],
+  })
+
+  const text = getResponseText(response) ?? ''
+  const clean = text.replace(/```json|```/g, '').trim()
+  return JSON.parse(clean)
+}

@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and, sql, inArray } from 'drizzle-orm'
 import { db } from '../db/db.js'
 import { recipes as recipesTable, users, recipeColumns } from '../db/schema.js'
 import { fullAuth, anyAuth } from '../middleware/auth.js'
 import { parseRecipeFromHtml, parseRecipeFromText } from '../services/parser.js'
-import { enrichRecipe } from '../services/claude.js'
+import { enrichRecipe, rankRecipesByIngredients } from '../services/claude.js'
 import { buildRecipeEmbeddingText, embedRecipe, embedQuery } from '../services/embeddings.js'
 import { generateShoppingListItems } from './plans.js'
 
@@ -254,6 +254,81 @@ recipes.post(
       results: filtered.slice(0, limit),
       total: filtered.length,
     })
+  }
+)
+
+// ─────────────────────────────────────────────
+// POST /recipes/match-ingredients
+// Rank recipes by how well they utilize a list
+// of on-hand ingredients
+// ─────────────────────────────────────────────
+
+recipes.post(
+  '/match-ingredients',
+  fullAuth,
+  zValidator(
+    'json',
+    z.object({
+      ingredients: z.array(z.string().min(1)).min(1),
+      limit: z.number().min(1).max(20).optional().default(5),
+    })
+  ),
+  async (c) => {
+    const { ingredients, limit } = c.req.valid('json')
+    const userId = await getOrCreateUserId()
+
+    // Narrow the whole library to a relevant candidate pool before
+    // asking Claude to do the actual ingredient-coverage ranking
+    const queryEmbedding = await embedQuery(ingredients.join(', '))
+    const embeddingStr = `[${queryEmbedding.join(',')}]`
+
+    const candidates = await db
+      .select({
+        id: recipesTable.id,
+        name: recipesTable.name,
+        ingredients: recipesTable.ingredients,
+      })
+      .from(recipesTable)
+      .where(eq(recipesTable.userId, userId))
+      .orderBy(sql`embedding <=> ${embeddingStr}::vector`)
+      .limit(30)
+
+    if (candidates.length === 0) {
+      return c.json({ error: 'No recipes in your library yet' }, 404)
+    }
+
+    let ranked
+    try {
+      ranked = await rankRecipesByIngredients(
+        ingredients,
+        candidates.map((r) => ({ id: r.id, name: r.name, ingredients: r.ingredients as string[] })),
+        limit
+      )
+    } catch {
+      return c.json({ error: 'Failed to match ingredients to recipes' }, 500)
+    }
+
+    const top = ranked.slice(0, limit)
+    const recipeDetails = await db
+      .select(recipeColumns)
+      .from(recipesTable)
+      .where(inArray(recipesTable.id, top.map((r) => r.recipeId)))
+
+    const recipeById = new Map(recipeDetails.map((r) => [r.id, r]))
+
+    const matches = top
+      .map((t) => {
+        const recipe = recipeById.get(t.recipeId)
+        if (!recipe) return null
+        return {
+          recipe,
+          usedIngredients: t.usedIngredients,
+          missingIngredients: t.missingIngredients,
+        }
+      })
+      .filter((m): m is NonNullable<typeof m> => m !== null)
+
+    return c.json({ matches })
   }
 )
 
