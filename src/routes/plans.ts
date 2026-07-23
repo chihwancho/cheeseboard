@@ -298,6 +298,12 @@ plans.delete('/:id', fullAuth, async (c) => {
     return c.json({ error: 'Meal plan not found' }, 404)
   }
 
+  // The plan record itself stays soft-deleted for history, but the
+  // scheduling rows have no independent meaning once it's deleted —
+  // leaving them behind makes them show up in day lookups and incorrectly
+  // count toward "recently used" exclusion in future meal plan generation.
+  await db.delete(mealPlanRecipes).where(eq(mealPlanRecipes.mealPlanId, id))
+
   return c.json({ success: true })
 })
 
