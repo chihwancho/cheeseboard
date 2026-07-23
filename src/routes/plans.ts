@@ -8,7 +8,7 @@ import { fullAuth } from '../middleware/auth.js'
 import { embedQuery } from '../services/embeddings.js'
 import { sql } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
-import { getResponseText } from '../services/claude.js'
+import { getResponseText, type MessageParams } from '../services/claude.js'
 
 export const plans = new Hono()
 
@@ -151,8 +151,9 @@ Only include slot keys for: ${slots.join(', ')}`
     const response = await anthropic.messages.create({
       model: 'deepseek-v4-pro',
       max_tokens: 2000,
+      thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: prompt }],
-    })
+    } as MessageParams)
 
     const text = getResponseText(response) ?? ''
     let planDays: any[] = []
@@ -492,8 +493,9 @@ Only include categories that have items.`
   const response = await anthropic.messages.create({
     model: 'deepseek-v4-pro',
     max_tokens: 2000,
+    thinking: { type: 'disabled' },
     messages: [{ role: 'user', content: prompt }],
-  })
+  } as MessageParams)
 
   const text = getResponseText(response) ?? ''
   const clean = text.replace(/```json|```/g, '').trim()

@@ -14,6 +14,14 @@ export function getResponseText(response: Anthropic.Message): string | null {
   return block && block.type === 'text' ? block.text : null
 }
 
+// The installed SDK version (0.36.0) predates the `thinking` param in its
+// types, but DeepSeek's API supports it at runtime — disabling it avoids
+// DeepSeek's default verbose reasoning eating the whole max_tokens budget
+// before it ever reaches the actual answer.
+export type MessageParams = Anthropic.MessageCreateParamsNonStreaming & {
+  thinking?: { type: 'disabled' }
+}
+
 export interface ExtractedRecipe {
   name: string
   description?: string
@@ -37,6 +45,7 @@ export async function extractRecipeFromHtml(html: string): Promise<ExtractedReci
   const response = await client.messages.create({
     model: 'deepseek-v4-pro',
     max_tokens: 2000,
+    thinking: { type: 'disabled' },
     messages: [
       {
         role: 'user',
@@ -51,7 +60,7 @@ HTML:
 ${html}`,
       },
     ],
-  })
+  } as MessageParams)
 
   try {
     const text = getResponseText(response)
@@ -79,6 +88,7 @@ export async function enrichRecipe(recipe: {
   const response = await client.messages.create({
     model: 'deepseek-v4-pro',
     max_tokens: 500,
+    thinking: { type: 'disabled' },
     messages: [
       {
         role: 'user',
@@ -99,7 +109,7 @@ Return this exact shape:
 }`,
       },
     ],
-  })
+  } as MessageParams)
 
   try {
     const text = getResponseText(response)
@@ -129,6 +139,7 @@ export async function rankRecipesByIngredients(
   const response = await client.messages.create({
     model: 'deepseek-v4-pro',
     max_tokens: 4000,
+    thinking: { type: 'disabled' },
     messages: [
       {
         role: 'user',
@@ -151,7 +162,7 @@ Return ONLY a JSON array of the top ${limit} best matches, ordered best match fi
 Only include recipes that use at least one on-hand ingredient. Return fewer than ${limit} if fewer qualify.`,
       },
     ],
-  })
+  } as MessageParams)
 
   const text = getResponseText(response) ?? ''
   const clean = text.replace(/```json|```/g, '').trim()
