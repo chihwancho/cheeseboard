@@ -12,7 +12,11 @@ import { getResponseText } from '../services/claude.js'
 
 export const plans = new Hono()
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// Using DeepSeek's Anthropic-compatible endpoint — see services/claude.ts
+const anthropic = new Anthropic({
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: 'https://api.deepseek.com/anthropic',
+})
 
 // ─────────────────────────────────────────────
 // POST /plans
@@ -145,7 +149,7 @@ Return ONLY a JSON array, no markdown, no explanation:
 Only include slot keys for: ${slots.join(', ')}`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
+      model: 'deepseek-v4-pro',
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -486,7 +490,7 @@ Return ONLY a JSON object, no markdown, no explanation:
 Only include categories that have items.`
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-5',
+    model: 'deepseek-v4-pro',
     max_tokens: 2000,
     messages: [{ role: 'user', content: prompt }],
   })

@@ -1,7 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 
+// Using DeepSeek's Anthropic-compatible endpoint — same SDK/message shape,
+// far cheaper than Claude, no rewrite of the calls below needed.
 const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: 'https://api.deepseek.com/anthropic',
 })
 
 // Extended thinking can put a 'thinking' block before the 'text' block,
@@ -32,7 +35,7 @@ export interface ExtractedRecipe {
 // Extract a recipe from raw HTML when Schema.org data isn't available
 export async function extractRecipeFromHtml(html: string): Promise<ExtractedRecipe | null> {
   const response = await client.messages.create({
-    model: 'claude-sonnet-5',
+    model: 'deepseek-v4-pro',
     max_tokens: 2000,
     messages: [
       {
@@ -74,7 +77,7 @@ export async function enrichRecipe(recipe: {
   dietaryTags: string[]
 }> {
   const response = await client.messages.create({
-    model: 'claude-sonnet-5',
+    model: 'deepseek-v4-pro',
     max_tokens: 500,
     messages: [
       {
@@ -124,7 +127,7 @@ export async function rankRecipesByIngredients(
   limit: number
 ): Promise<IngredientMatch[]> {
   const response = await client.messages.create({
-    model: 'claude-sonnet-5',
+    model: 'deepseek-v4-pro',
     max_tokens: 4000,
     messages: [
       {
