@@ -7,16 +7,9 @@ import { recipes as recipesTable, mealPlans, mealPlanRecipes, shoppingLists, use
 import { fullAuth } from '../middleware/auth.js'
 import { embedQuery } from '../services/embeddings.js'
 import { sql } from 'drizzle-orm'
-import Anthropic from '@anthropic-ai/sdk'
-import { getResponseText, type MessageParams } from '../services/claude.js'
+import { client as anthropic, MODEL, getResponseText, type MessageParams } from '../services/claude.js'
 
 export const plans = new Hono()
-
-// Using DeepSeek's Anthropic-compatible endpoint — see services/claude.ts
-const anthropic = new Anthropic({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com/anthropic',
-})
 
 // ─────────────────────────────────────────────
 // POST /plans
@@ -149,7 +142,7 @@ Return ONLY a JSON array, no markdown, no explanation:
 Only include slot keys for: ${slots.join(', ')}`
 
     const response = await anthropic.messages.create({
-      model: 'deepseek-v4-pro',
+      model: MODEL,
       max_tokens: 2000,
       thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: prompt }],
@@ -491,7 +484,7 @@ Return ONLY a JSON object, no markdown, no explanation:
 Only include categories that have items.`
 
   const response = await anthropic.messages.create({
-    model: 'deepseek-v4-pro',
+    model: MODEL,
     max_tokens: 2000,
     thinking: { type: 'disabled' },
     messages: [{ role: 'user', content: prompt }],

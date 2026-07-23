@@ -1,11 +1,20 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-// Using DeepSeek's Anthropic-compatible endpoint — same SDK/message shape,
-// far cheaper than Claude, no rewrite of the calls below needed.
-const client = new Anthropic({
+// Single source of truth for the LLM provider/model — every call in this
+// codebase (here and in routes/plans.ts) goes through this client and MODEL,
+// so switching providers is a change in one place instead of five.
+//
+// Currently DeepSeek's Anthropic-compatible endpoint — same SDK/message
+// shape as Claude, far cheaper. To move back to Claude: drop `baseURL`,
+// point `apiKey` back at ANTHROPIC_API_KEY, and set MODEL to a Claude model
+// name (e.g. 'claude-sonnet-5'). getResponseText() and the thinking-disabled
+// requests below already work correctly against Claude too.
+export const client = new Anthropic({
   apiKey: process.env.DEEPSEEK_API_KEY,
   baseURL: 'https://api.deepseek.com/anthropic',
 })
+
+export const MODEL = 'deepseek-v4-pro'
 
 // Extended thinking can put a 'thinking' block before the 'text' block,
 // so the text response isn't reliably at content[0].
@@ -43,7 +52,7 @@ export interface ExtractedRecipe {
 // Extract a recipe from raw HTML when Schema.org data isn't available
 export async function extractRecipeFromHtml(html: string): Promise<ExtractedRecipe | null> {
   const response = await client.messages.create({
-    model: 'deepseek-v4-pro',
+    model: MODEL,
     max_tokens: 2000,
     thinking: { type: 'disabled' },
     messages: [
@@ -86,7 +95,7 @@ export async function enrichRecipe(recipe: {
   dietaryTags: string[]
 }> {
   const response = await client.messages.create({
-    model: 'deepseek-v4-pro',
+    model: MODEL,
     max_tokens: 500,
     thinking: { type: 'disabled' },
     messages: [
@@ -137,7 +146,7 @@ export async function rankRecipesByIngredients(
   limit: number
 ): Promise<IngredientMatch[]> {
   const response = await client.messages.create({
-    model: 'deepseek-v4-pro',
+    model: MODEL,
     max_tokens: 4000,
     thinking: { type: 'disabled' },
     messages: [
