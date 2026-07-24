@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { put } from '@vercel/blob'
+import { put, del } from '@vercel/blob'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq, and, sql, inArray } from 'drizzle-orm'
@@ -540,6 +540,48 @@ recipes.post('/:id/images', fullAuth, async (c) => {
     .set({ images: [...(existing.images ?? []), imageUrl], updatedAt: new Date() })
     .where(eq(recipesTable.id, id))
     .returning(recipeColumns)
+
+  return c.json({ success: true, recipe })
+})
+
+// ─────────────────────────────────────────────
+// DELETE /recipes/:id/images
+// Remove one image (by URL) from the recipe.
+// Also deletes it from Vercel Blob if we hosted it.
+// ─────────────────────────────────────────────
+
+recipes.delete('/:id/images', fullAuth, async (c) => {
+  const id = c.req.param('id')
+  const userId = await getOrCreateUserId()
+
+  const parsed = z.object({ url: z.string().url() }).safeParse(await c.req.json())
+  if (!parsed.success) {
+    return c.json({ error: 'Expected a JSON body with a valid "url"' }, 400)
+  }
+  const { url } = parsed.data
+
+  const [existing] = await db
+    .select({ images: recipesTable.images })
+    .from(recipesTable)
+    .where(and(eq(recipesTable.id, id), eq(recipesTable.userId, userId)))
+    .limit(1)
+
+  if (!existing) {
+    return c.json({ error: 'Recipe not found' }, 404)
+  }
+  if (!existing.images?.includes(url)) {
+    return c.json({ error: 'Image not found on this recipe' }, 404)
+  }
+
+  const [recipe] = await db
+    .update(recipesTable)
+    .set({ images: existing.images.filter((img) => img !== url), updatedAt: new Date() })
+    .where(eq(recipesTable.id, id))
+    .returning(recipeColumns)
+
+  if (url.includes('.blob.vercel-storage.com/')) {
+    await del(url).catch(() => {})
+  }
 
   return c.json({ success: true, recipe })
 })
