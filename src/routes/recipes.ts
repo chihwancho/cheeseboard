@@ -113,9 +113,9 @@ recipes.post(
 recipes.post(
   '/import/text',
   anyAuth,
-  zValidator('json', z.object({ text: z.string().min(10) })),
+  zValidator('json', z.object({ text: z.string().min(10), sourceUrl: z.string().url().optional() })),
   async (c) => {
-    const { text } = c.req.valid('json')
+    const { text, sourceUrl } = c.req.valid('json')
     const userId = await getOrCreateUserId()
 
     const parsed = await parseRecipeFromText(text)
@@ -159,7 +159,7 @@ recipes.post(
         proteinGrams: parsed.proteinGrams ?? enriched.proteinGrams ?? null,
         fatGrams: parsed.fatGrams ?? enriched.fatGrams ?? null,
         carbGrams: parsed.carbGrams ?? enriched.carbGrams ?? null,
-        sourceUrl: null,
+        sourceUrl: sourceUrl ?? null,
         images: parsed.images ?? [],
         embedding,
       })
