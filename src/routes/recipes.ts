@@ -468,9 +468,9 @@ recipes.get('/:id', fullAuth, async (c) => {
 
 // ─────────────────────────────────────────────
 // POST /recipes/:id/images
-// Upload an image (multipart/form-data, field
-// name "image") and append it to the recipe's
-// image list. Stored in Vercel Blob.
+// Add an image to the recipe, either:
+// - multipart/form-data with field "image" — uploaded to Vercel Blob
+// - application/json with { url } — linked directly, no upload
 // ─────────────────────────────────────────────
 
 recipes.post('/:id/images', fullAuth, async (c) => {
@@ -487,22 +487,34 @@ recipes.post('/:id/images', fullAuth, async (c) => {
     return c.json({ error: 'Recipe not found' }, 404)
   }
 
-  const body = await c.req.parseBody()
-  const file = body.image
-  if (!(file instanceof File)) {
-    return c.json({ error: 'No image file provided (expected multipart field "image")' }, 400)
-  }
-  if (!file.type.startsWith('image/')) {
-    return c.json({ error: 'File must be an image' }, 400)
-  }
+  const contentType = c.req.header('content-type') ?? ''
+  let imageUrl: string
 
-  const blob = await put(`recipes/${id}/${crypto.randomUUID()}-${file.name}`, file, {
-    access: 'public',
-  })
+  if (contentType.includes('application/json')) {
+    const parsed = z.object({ url: z.string().url() }).safeParse(await c.req.json())
+    if (!parsed.success) {
+      return c.json({ error: 'Expected a JSON body with a valid "url"' }, 400)
+    }
+    imageUrl = parsed.data.url
+  } else {
+    const body = await c.req.parseBody()
+    const file = body.image
+    if (!(file instanceof File)) {
+      return c.json({ error: 'No image file provided (expected multipart field "image")' }, 400)
+    }
+    if (!file.type.startsWith('image/')) {
+      return c.json({ error: 'File must be an image' }, 400)
+    }
+
+    const blob = await put(`recipes/${id}/${crypto.randomUUID()}-${file.name}`, file, {
+      access: 'public',
+    })
+    imageUrl = blob.url
+  }
 
   const [recipe] = await db
     .update(recipesTable)
-    .set({ images: [...(existing.images ?? []), blob.url], updatedAt: new Date() })
+    .set({ images: [...(existing.images ?? []), imageUrl], updatedAt: new Date() })
     .where(eq(recipesTable.id, id))
     .returning(recipeColumns)
 
