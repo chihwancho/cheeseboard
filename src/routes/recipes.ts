@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { put } from '@vercel/blob'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { eq, and, sql, inArray } from 'drizzle-orm'
@@ -463,6 +464,49 @@ recipes.get('/:id', fullAuth, async (c) => {
   }
 
   return c.json({ recipe })
+})
+
+// ─────────────────────────────────────────────
+// POST /recipes/:id/images
+// Upload an image (multipart/form-data, field
+// name "image") and append it to the recipe's
+// image list. Stored in Vercel Blob.
+// ─────────────────────────────────────────────
+
+recipes.post('/:id/images', fullAuth, async (c) => {
+  const id = c.req.param('id')
+  const userId = await getOrCreateUserId()
+
+  const [existing] = await db
+    .select({ images: recipesTable.images })
+    .from(recipesTable)
+    .where(and(eq(recipesTable.id, id), eq(recipesTable.userId, userId)))
+    .limit(1)
+
+  if (!existing) {
+    return c.json({ error: 'Recipe not found' }, 404)
+  }
+
+  const body = await c.req.parseBody()
+  const file = body.image
+  if (!(file instanceof File)) {
+    return c.json({ error: 'No image file provided (expected multipart field "image")' }, 400)
+  }
+  if (!file.type.startsWith('image/')) {
+    return c.json({ error: 'File must be an image' }, 400)
+  }
+
+  const blob = await put(`recipes/${id}/${crypto.randomUUID()}-${file.name}`, file, {
+    access: 'public',
+  })
+
+  const [recipe] = await db
+    .update(recipesTable)
+    .set({ images: [...(existing.images ?? []), blob.url], updatedAt: new Date() })
+    .where(eq(recipesTable.id, id))
+    .returning(recipeColumns)
+
+  return c.json({ success: true, recipe })
 })
 
 // ─────────────────────────────────────────────
