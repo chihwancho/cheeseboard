@@ -94,6 +94,7 @@ export const recipes = pgTable(
 
     // Source
     sourceUrl: text('source_url'),
+    images: text('images').array(),               // extracted from schema.org/og:image on import
 
     // User rating — 1 to 5, null if not yet rated
     rating: integer('rating'),
@@ -139,6 +140,7 @@ export const recipeColumns = {
   rating: recipes.rating,
   ratingNote: recipes.ratingNote,
   sourceUrl: recipes.sourceUrl,
+  images: recipes.images,
 }
 
 // ─────────────────────────────────────────────

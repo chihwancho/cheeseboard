@@ -74,6 +74,16 @@ function normalizeSchemaOrg(schema: any): ExtractedRecipe {
     return []
   }
 
+  // Normalize images — can be a URL string, array of URL strings, a single
+  // ImageObject ({url: ...}), or an array of ImageObjects
+  const parseImages = (raw: any): string[] => {
+    if (!raw) return []
+    const items = Array.isArray(raw) ? raw : [raw]
+    return items
+      .map((item: any) => (typeof item === 'string' ? item : item?.url))
+      .filter(Boolean)
+  }
+
   // Nutrition block
   const nutrition = schema.nutrition ?? {}
 
@@ -106,7 +116,18 @@ function normalizeSchemaOrg(schema: any): ExtractedRecipe {
     carbGrams: nutrition.carbohydrateContent
       ? parseFloat(nutrition.carbohydrateContent)
       : undefined,
+    images: parseImages(schema.image),
   }
+}
+
+// Fallback hero image when schema.org has none (or the LLM extraction path
+// runs instead, which can't see images at all since it only gets stripped
+// text) — og:image is present on nearly every modern recipe site.
+function extractOgImage(html: string): string[] {
+  const match =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+  return match ? [match[1]] : []
 }
 
 // Strip HTML tags and truncate to avoid token limits
@@ -132,12 +153,19 @@ export async function parseRecipeFromHtml(html: string): Promise<ExtractedRecipe
   // Try Schema.org first — free and fast
   const schemaRecipe = extractSchemaOrg(html)
   if (schemaRecipe && schemaRecipe.ingredients.length > 0) {
+    if (!schemaRecipe.images?.length) {
+      schemaRecipe.images = extractOgImage(html)
+    }
     return schemaRecipe
   }
 
-  // Fall back to Claude extraction with stripped/truncated text
+  // Fall back to Claude extraction with stripped/truncated text — that text
+  // has no image URLs left in it, so pull a hero image separately from the
+  // raw HTML instead.
   const cleanText = extractTextFromHtml(html)
-  return extractRecipeFromHtml(cleanText)
+  const extracted = await extractRecipeFromHtml(cleanText)
+  if (!extracted) return null
+  return { ...extracted, images: extractOgImage(html) }
 }
 
 // Parse a recipe from raw text — either a hand-typed/pasted recipe, or a

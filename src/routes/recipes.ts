@@ -94,6 +94,7 @@ recipes.post(
         fatGrams: parsed.fatGrams ?? enriched.fatGrams ?? null,
         carbGrams: parsed.carbGrams ?? enriched.carbGrams ?? null,
         sourceUrl: url,
+        images: parsed.images ?? [],
         embedding,
       })
       .returning()
@@ -159,6 +160,7 @@ recipes.post(
         fatGrams: parsed.fatGrams ?? enriched.fatGrams ?? null,
         carbGrams: parsed.carbGrams ?? enriched.carbGrams ?? null,
         sourceUrl: null,
+        images: parsed.images ?? [],
         embedding,
       })
       .returning()

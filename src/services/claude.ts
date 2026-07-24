@@ -47,6 +47,7 @@ export interface ExtractedRecipe {
   proteinGrams?: number
   fatGrams?: number
   carbGrams?: number
+  images?: string[]
 }
 
 // Extract a recipe from raw HTML when Schema.org data isn't available
