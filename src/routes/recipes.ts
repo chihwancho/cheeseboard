@@ -470,7 +470,9 @@ recipes.get('/:id', fullAuth, async (c) => {
 // POST /recipes/:id/images
 // Add an image to the recipe, either:
 // - multipart/form-data with field "image" — uploaded to Vercel Blob
-// - application/json with { url } — linked directly, no upload
+// - application/json with { url } — fetched server-side and re-uploaded
+//   to Vercel Blob (so the recipe doesn't depend on a third-party URL
+//   staying alive or allowing hotlinking)
 // ─────────────────────────────────────────────
 
 recipes.post('/:id/images', fullAuth, async (c) => {
@@ -495,7 +497,28 @@ recipes.post('/:id/images', fullAuth, async (c) => {
     if (!parsed.success) {
       return c.json({ error: 'Expected a JSON body with a valid "url"' }, 400)
     }
-    imageUrl = parsed.data.url
+
+    let fetched: Response
+    try {
+      fetched = await fetch(parsed.data.url)
+    } catch {
+      return c.json({ error: 'Could not fetch image from that URL' }, 400)
+    }
+    if (!fetched.ok) {
+      return c.json({ error: 'Could not fetch image from that URL' }, 400)
+    }
+    const fetchedType = fetched.headers.get('content-type')?.split(';')[0] ?? ''
+    if (!fetchedType.startsWith('image/')) {
+      return c.json({ error: 'URL does not point to an image' }, 400)
+    }
+
+    const ext = fetchedType.split('/')[1] || 'jpg'
+    const bytes = Buffer.from(await fetched.arrayBuffer())
+    const blob = await put(`recipes/${id}/${crypto.randomUUID()}.${ext}`, bytes, {
+      access: 'public',
+      contentType: fetchedType,
+    })
+    imageUrl = blob.url
   } else {
     const body = await c.req.parseBody()
     const file = body.image
