@@ -384,6 +384,7 @@ recipes.get('/', fullAuth, async (c) => {
     .select({
       id: recipesTable.id,
       name: recipesTable.name,
+      description: recipesTable.description,
       cuisine: recipesTable.cuisine,
       category: recipesTable.category,
       dietaryTags: recipesTable.dietaryTags,
@@ -391,6 +392,7 @@ recipes.get('/', fullAuth, async (c) => {
       cookTimeMinutes: recipesTable.cookTimeMinutes,
       calories: recipesTable.calories,
       rating: recipesTable.rating,
+      images: recipesTable.images,
       createdAt: recipesTable.createdAt,
     })
     .from(recipesTable)
