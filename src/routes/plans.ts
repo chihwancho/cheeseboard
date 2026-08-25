@@ -118,12 +118,13 @@ Rules:
 - Use each recipe at most twice across the whole plan
 - Vary meals — don't repeat the same recipe on consecutive days
 - Prefer higher-rated recipes when available
+- When choices are otherwise similar, prefer combinations of recipes that share ingredients across the plan (e.g. recipes that both use cilantro, or both use chicken thighs) — this keeps the resulting shopping list smaller and reduces produce/ingredients bought but not fully used
 - If not enough candidates for a slot, leave it null
 
 Available recipes by slot:
 ${Object.entries(candidatesBySlot).map(([slot, recipes]) =>
   `${slot.toUpperCase()}:\n${recipes.map(r =>
-    `  - id: ${r.id}, name: "${r.name}", calories: ${r.calories ?? 'unknown'}, rating: ${r.rating ?? 'unrated'}`
+    `  - id: ${r.id}, name: "${r.name}", calories: ${r.calories ?? 'unknown'}, rating: ${r.rating ?? 'unrated'}, ingredients: ${r.ingredients.join('; ')}`
   ).join('\n')}`
 ).join('\n\n')}
 
