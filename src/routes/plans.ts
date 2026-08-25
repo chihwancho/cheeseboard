@@ -144,7 +144,9 @@ Only include slot keys for: ${slots.join(', ')}`
 
     const response = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 2000,
+      // Up to 14 days x 4 slots = 56 entries — same truncation risk as
+      // the shopping list prompt below, so give it matching headroom.
+      max_tokens: 4000,
       thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: prompt }],
     } as MessageParams)
@@ -492,7 +494,10 @@ Only include categories that have items.`
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 2000,
+    // A week-long, multi-slot plan can produce 100+ ingredient lines —
+    // 2000 was truncating the JSON response for anything past a
+    // handful of recipes, causing JSON.parse to fail below.
+    max_tokens: 8000,
     thinking: { type: 'disabled' },
     messages: [{ role: 'user', content: prompt }],
   } as MessageParams)
