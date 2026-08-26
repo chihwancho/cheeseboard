@@ -403,12 +403,18 @@ plans.post('/:id/shopping-list', fullAuth, async (c) => {
 // GET /plans/day/:date
 // Recipes scheduled for a single day, plus a
 // shopping list scoped to just that day (not
-// persisted — computed on demand)
+// persisted — computed on demand). The shopping
+// list requires an LLM call and reliably takes
+// ~10-12s, so it can be skipped with
+// ?shoppingList=false for callers that only need
+// the meals (e.g. a dashboard widget) and would
+// otherwise time out waiting on it.
 // ─────────────────────────────────────────────
 
 plans.get('/day/:date', fullAuth, async (c) => {
   const date = c.req.param('date')
   const userId = await getOrCreateUserId()
+  const includeShoppingList = c.req.query('shoppingList') !== 'false'
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return c.json({ error: 'Invalid date format, expected YYYY-MM-DD' }, 400)
@@ -429,13 +435,15 @@ plans.get('/day/:date', fullAuth, async (c) => {
 
   const meals = rows.map(({ mealSlot, ...recipe }) => ({ mealSlot, recipe }))
 
-  let shoppingList: Record<string, { item: string; recipes: string[] }[]>
-  try {
-    shoppingList = await generateShoppingListItems(
-      rows.map(r => ({ name: r.name, ingredients: r.ingredients as string[] }))
-    )
-  } catch {
-    return c.json({ error: 'Failed to generate shopping list for this day' }, 500)
+  let shoppingList: Record<string, { item: string; recipes: string[] }[]> = {}
+  if (includeShoppingList) {
+    try {
+      shoppingList = await generateShoppingListItems(
+        rows.map(r => ({ name: r.name, ingredients: r.ingredients as string[] }))
+      )
+    } catch {
+      return c.json({ error: 'Failed to generate shopping list for this day' }, 500)
+    }
   }
 
   return c.json({ date, meals, shoppingList })
