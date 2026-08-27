@@ -87,6 +87,16 @@ function normalizeSchemaOrg(schema: any): ExtractedRecipe {
   // Nutrition block
   const nutrition = schema.nutrition ?? {}
 
+  // category/cuisine are plain text columns, but some sites' schema.org
+  // data gives these as an array — join it into a single string instead
+  // of letting the raw array reach the DB driver (which serializes it as
+  // a Postgres array literal, e.g. `{"Dinner","Main Course"}`)
+  const parseTextOrArray = (raw: any): string | undefined => {
+    if (!raw) return undefined
+    if (Array.isArray(raw)) return raw.filter(Boolean).join(', ') || undefined
+    return String(raw)
+  }
+
   return {
     name: schema.name ?? 'Untitled Recipe',
     description: schema.description,
@@ -99,8 +109,8 @@ function normalizeSchemaOrg(schema: any): ExtractedRecipe {
       : undefined,
     prepTimeMinutes: parseDuration(schema.prepTime),
     cookTimeMinutes: parseDuration(schema.cookTime),
-    category: schema.recipeCategory,
-    cuisine: schema.recipeCuisine,
+    category: parseTextOrArray(schema.recipeCategory),
+    cuisine: parseTextOrArray(schema.recipeCuisine),
     keywords: schema.keywords
       ? schema.keywords.split(',').map((k: string) => k.trim())
       : undefined,
